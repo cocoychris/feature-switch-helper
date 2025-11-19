@@ -6,7 +6,6 @@
   "type": "module",
   "files": [
     "dist",
-    "scripts",
     "package.json",
     "README.md"
   ],
