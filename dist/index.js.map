@@ -1,1 +1,0 @@
-{"version":3,"file":"index.js","sourceRoot":"/","sources":["index.ts"],"names":[],"mappings":"AAAA,cAAc,gCAAgC,CAAC;AAC/C,cAAc,wCAAwC,CAAC","sourcesContent":["export * from './src/feature-switch-helper.js';\nexport * from './src/dto/feature-switch-config.dto.js';\n"]}
