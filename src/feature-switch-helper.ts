@@ -1,27 +1,29 @@
-import { FeatureDefDto } from './dto/feature-switch-config.dto.js'
-import { FeatureSwitchConfigDto } from './dto/feature-switch-config.dto.js'
-import { PlainObject } from './types/plain-object.js'
-import { deepFreeze } from './utils/deep-object.utils.js'
-import { toDto } from './utils/dto.utils.js'
+import { FeatureDefDto } from "./dto/feature-switch-config.dto.js";
+import { FeatureSwitchConfigDto } from "./dto/feature-switch-config.dto.js";
+import { PlainObject } from "./types/plain-object.js";
+import { deepFreeze } from "./utils/deep-object.utils.js";
+import { toDto } from "./utils/dto.utils.js";
 
 export enum Environment {
-  DEVELOPMENT = 'development',
-  TEST = 'test',
-  UAT = 'uat',
-  PRODUCTION = 'production',
+  DEVELOPMENT = "development",
+  TEST = "test",
+  UAT = "uat",
+  PRODUCTION = "production",
 }
 
 export interface ILogger {
-  log: (message: string) => void
+  log: (message: string) => void;
+  warn: (message: string | Error) => void;
 }
 
 export interface FeatureSwitchHelperOptions {
-  logger?: ILogger
+  logger?: ILogger;
+  ignoreMultipleInit?: boolean;
 }
 
 export class FeatureSwitchHelper {
-  private static _instance: FeatureSwitchHelper | null = null
-  private static canNew: boolean = false
+  private static _instance: FeatureSwitchHelper | null = null;
+  private static canNew: boolean = false;
 
   /**
    * 初始化功能開關助手
@@ -32,15 +34,26 @@ export class FeatureSwitchHelper {
   static init(
     environment: Environment,
     config: FeatureSwitchConfigDto | PlainObject<FeatureSwitchConfigDto>,
-    options?: FeatureSwitchHelperOptions,
+    options?: FeatureSwitchHelperOptions
   ): void {
+    const { ignoreMultipleInit = false } = options || {};
     if (this._instance) {
-      throw new Error('FeatureSwitchHelper has already been initialized.')
+      const error = new Error(
+        "FeatureSwitchHelper has already been initialized."
+      );
+      if (ignoreMultipleInit) {
+        this._instance.logger.warn(error as Error);
+        return;
+      }
+      throw error;
     }
-    const configDto = config instanceof FeatureSwitchConfigDto ? config : toDto(FeatureSwitchConfigDto, config)
-    this.canNew = true
-    this._instance = new FeatureSwitchHelper(environment, configDto, options)
-    this.canNew = false
+    const configDto =
+      config instanceof FeatureSwitchConfigDto
+        ? config
+        : toDto(FeatureSwitchConfigDto, config);
+    this.canNew = true;
+    this._instance = new FeatureSwitchHelper(environment, configDto, options);
+    this.canNew = false;
   }
 
   /**
@@ -49,7 +62,7 @@ export class FeatureSwitchHelper {
    * @returns 是否啟用
    */
   static isFeatureEnabled<T extends string>(featureName: T): boolean {
-    return this.instance.isFeatureEnabled(featureName)
+    return this.instance.isFeatureEnabled(featureName);
   }
 
   /**
@@ -58,36 +71,42 @@ export class FeatureSwitchHelper {
    * @returns 功能開關的相關資訊，若不存在則返回 null
    */
   static getFeatureDef<T extends string>(featureName: T): FeatureDefDto | null {
-    return this.instance.getFeatureDef(featureName)
+    return this.instance.getFeatureDef(featureName);
   }
 
   private static get instance(): FeatureSwitchHelper {
     if (!FeatureSwitchHelper._instance) {
-      throw new Error('FeatureSwitchHelper is not initialized. Please call FeatureSwitchHelper.init() first.')
+      throw new Error(
+        "FeatureSwitchHelper is not initialized. Please call FeatureSwitchHelper.init() first."
+      );
     }
-    return FeatureSwitchHelper._instance
+    return FeatureSwitchHelper._instance;
   }
 
-  private readonly environment: Environment
-  private readonly config: FeatureSwitchConfigDto
-  private readonly featureEnabledMap: Record<string, boolean>
-  private readonly logger: ILogger
+  private readonly environment: Environment;
+  private readonly config: FeatureSwitchConfigDto;
+  private readonly featureEnabledMap: Record<string, boolean>;
+  private readonly logger: ILogger;
 
-  constructor(environment: Environment, config: FeatureSwitchConfigDto, options?: FeatureSwitchHelperOptions) {
+  constructor(
+    environment: Environment,
+    config: FeatureSwitchConfigDto,
+    options?: FeatureSwitchHelperOptions
+  ) {
     if (!FeatureSwitchHelper.canNew) {
       throw new Error(
-        'FeatureSwitchHelper constructor is private. Please use FeatureSwitchHelper.init() to initialize.',
-      )
+        "FeatureSwitchHelper constructor is private. Please use FeatureSwitchHelper.init() to initialize."
+      );
     }
-    const { logger = console } = options || {}
-    this.environment = environment
-    this.config = deepFreeze(config)
-    this.logger = logger
+    const { logger = console } = options || {};
+    this.environment = environment;
+    this.config = deepFreeze(config);
+    this.logger = logger;
     // 建立索引，以便快速查詢功能是否啟用
-    this.featureEnabledMap = this.createFeatureEnabledMap(this.config.features)
+    this.featureEnabledMap = this.createFeatureEnabledMap(this.config.features);
     // 在模組加載時記錄功能開關的使用情況
-    this.logger.log(`Current Environment: ${this.environment}`)
-    this.logFeatureSwitchUsage(this.featureEnabledMap)
+    this.logger.log(`Current Environment: ${this.environment}`);
+    this.logFeatureSwitchUsage(this.featureEnabledMap);
   }
 
   /**
@@ -96,21 +115,21 @@ export class FeatureSwitchHelper {
    * @returns 是否啟用
    */
   private isFeatureEnabled<T extends string>(featureName: T): boolean {
-    const isEnabled = this.featureEnabledMap[featureName]
+    const isEnabled = this.featureEnabledMap[featureName];
     if (isEnabled === undefined) {
-      const message = `Feature "${featureName}" is not defined in 'feature-switch.json'.`
+      const message = `Feature "${featureName}" is not defined in 'feature-switch.json'.`;
       if (this.config.validationOptions.shouldNotUseUndefinedFeatureSwitches) {
-        throw new Error(message)
+        throw new Error(message);
       }
-      console.warn(message)
-      return false
+      console.warn(message);
+      return false;
     }
     if (isEnabled) {
-      console.log(`Feature "${featureName}" is used.`)
+      console.log(`Feature "${featureName}" is used.`);
     } else {
-      console.log(`Feature "${featureName}" is skipped.`)
+      console.log(`Feature "${featureName}" is skipped.`);
     }
-    return isEnabled
+    return isEnabled;
   }
 
   /**
@@ -118,35 +137,44 @@ export class FeatureSwitchHelper {
    * @param featureName 功能名稱
    * @returns 功能開關的相關資訊，若不存在則返回 null
    */
-  private getFeatureDef<T extends string>(featureName: T): FeatureDefDto | null {
-    return this.config.features.get(featureName) || null
+  private getFeatureDef<T extends string>(
+    featureName: T
+  ): FeatureDefDto | null {
+    return this.config.features.get(featureName) || null;
   }
 
-  private createFeatureEnabledMap(features: Map<string, FeatureDefDto>): Record<string, boolean> {
-    const map: Record<string, boolean> = {}
+  private createFeatureEnabledMap(
+    features: Map<string, FeatureDefDto>
+  ): Record<string, boolean> {
+    const map: Record<string, boolean> = {};
     features.forEach((featureDef, featureName) => {
       const isEnabled =
         featureDef.isForceEnabled ||
-        (Environment.DEVELOPMENT === this.environment && featureDef.isDevFeature) ||
+        (Environment.DEVELOPMENT === this.environment &&
+          featureDef.isDevFeature) ||
         (Environment.TEST === this.environment && featureDef.isTestFeature) ||
-        (Environment.UAT === this.environment && featureDef.isUatFeature)
+        (Environment.UAT === this.environment && featureDef.isUatFeature);
 
-      map[featureName] = isEnabled
-    })
-    return map
+      map[featureName] = isEnabled;
+    });
+    return map;
   }
 
   private logFeatureSwitchUsage(featureEnabledMap: Record<string, boolean>) {
-    const enabledFeatures: string[] = []
-    const disabledFeatures: string[] = []
+    const enabledFeatures: string[] = [];
+    const disabledFeatures: string[] = [];
     for (const [featureName, isEnabled] of Object.entries(featureEnabledMap)) {
       if (isEnabled) {
-        enabledFeatures.push(featureName)
+        enabledFeatures.push(featureName);
       } else {
-        disabledFeatures.push(featureName)
+        disabledFeatures.push(featureName);
       }
     }
-    this.logger.log(`Enabled Features: ${JSON.stringify(enabledFeatures, null, 2)}`)
-    this.logger.log(`Disabled Features: ${JSON.stringify(disabledFeatures, null, 2)}`)
+    this.logger.log(
+      `Enabled Features: ${JSON.stringify(enabledFeatures, null, 2)}`
+    );
+    this.logger.log(
+      `Disabled Features: ${JSON.stringify(disabledFeatures, null, 2)}`
+    );
   }
 }
